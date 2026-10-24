@@ -1,0 +1,9 @@
+fastapi
+uvicorn[standard]
+python-dotenv
+llama-index-core
+llama-index-llms-mistralai
+llama-index-embeddings-huggingface
+llama-index-vector-stores-supabase
+pytest
+httpx
