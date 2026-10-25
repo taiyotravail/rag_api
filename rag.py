@@ -4,6 +4,7 @@ from typing import Any, Optional
 
 from llama_index.core import Settings, StorageContext, VectorStoreIndex
 from llama_index.core.prompts import PromptTemplate
+from llama_index.core.schema import MetadataMode, NodeWithScore
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from llama_index.llms.mistralai import MistralAI
 from llama_index.vector_stores.supabase import SupabaseVectorStore
@@ -55,6 +56,25 @@ def create_query_engine(index: VectorStoreIndex, top_k: int) -> Any:
         similarity_top_k=top_k,
         text_qa_template=PromptTemplate(QA_TEMPLATE_STR),
     )
+
+
+def retrieve_nodes(index: VectorStoreIndex, question: str, top_k: int) -> list[NodeWithScore]:
+    """Récupère les `top_k` chunks les plus proches de la question, sans aucun appel au LLM."""
+    return index.as_retriever(similarity_top_k=top_k).retrieve(question)
+
+
+def build_context(nodes: list[NodeWithScore]) -> str:
+    """Assemble le `context_str` comme le synthétiseur `compact` de LlamaIndex utilisé par `/query`.
+
+    Métadonnées visibles par le LLM incluses, chunks vides ignorés, séparateur : une ligne vide.
+    """
+    chunks = (node.node.get_content(metadata_mode=MetadataMode.LLM).strip() for node in nodes)
+    return "\n\n".join(chunk for chunk in chunks if chunk)
+
+
+def build_prompt(context: str, question: str) -> str:
+    """Remplit `QA_TEMPLATE_STR` avec le contexte et la question : le prompt prêt à envoyer à un LLM."""
+    return PromptTemplate(QA_TEMPLATE_STR).format(context_str=context, query_str=question)
 
 
 def read_required_environment_variable(name: str) -> str:

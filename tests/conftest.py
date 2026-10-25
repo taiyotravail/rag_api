@@ -36,6 +36,22 @@ class FakeQueryEngine:
         return self.response
 
 
+class FakeRetriever:
+    """Remplace `rag.retrieve_nodes` : renvoie des nœuds prédéfinis ou lève l'erreur configurée."""
+
+    def __init__(self, nodes: list[NodeWithScore]) -> None:
+        self.nodes = nodes
+        self.error: Exception | None = None
+        self.calls: list[tuple[object, str, int]] = []
+
+    def __call__(self, index: object, question: str, top_k: int) -> list[NodeWithScore]:
+        """Enregistre l'appel puis renvoie les nœuds (ou lève l'erreur)."""
+        self.calls.append((index, question, top_k))
+        if self.error is not None:
+            raise self.error
+        return self.nodes
+
+
 def make_source_nodes() -> list[NodeWithScore]:
     """Construit deux chunks sources fictifs (aucune donnée personnelle)."""
     return [
@@ -57,15 +73,32 @@ def fake_query_engine(source_nodes: list[NodeWithScore]) -> FakeQueryEngine:
 
 
 @pytest.fixture
-def configured_mistral_keys(monkeypatch: pytest.MonkeyPatch, fake_query_engine: FakeQueryEngine) -> list[str | None]:
+def fake_retriever(source_nodes: list[NodeWithScore]) -> FakeRetriever:
+    """Retriever factice renvoyant les chunks sources fictifs."""
+    return FakeRetriever(source_nodes)
+
+
+@pytest.fixture
+def fake_index() -> object:
+    """Index factice : seul son identité compte (il est transmis tel quel au retriever)."""
+    return object()
+
+
+@pytest.fixture
+def configured_mistral_keys(
+    monkeypatch: pytest.MonkeyPatch,
+    fake_query_engine: FakeQueryEngine,
+    fake_retriever: FakeRetriever,
+    fake_index: object,
+) -> list[str | None]:
     """Neutralise le `.env` local, HuggingFace, Supabase et Mistral ; enregistre les clés passées à `configure_models`."""
     keys: list[str | None] = []
-    fake_index = object()
     monkeypatch.setattr(main, "load_dotenv", lambda: None)
     monkeypatch.setenv("SUPABASE_DB_URL", "postgresql://fake")
     monkeypatch.setattr(rag, "configure_models", keys.append)
     monkeypatch.setattr(rag, "load_index", lambda url: fake_index)
     monkeypatch.setattr(rag, "create_query_engine", lambda index, top_k: fake_query_engine)
+    monkeypatch.setattr(rag, "retrieve_nodes", fake_retriever)
     return keys
 
 

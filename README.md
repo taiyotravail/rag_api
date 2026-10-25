@@ -58,6 +58,27 @@ Réponse :
 
 Codes d'erreur : `422` (requête invalide), `502` (erreur de Mistral), `503` (`MISTRAL_API_KEY` non configurée).
 
+### `POST /retrieve`
+
+Partie retrieval seule, sans LLM ni clé Mistral : renvoie le prompt rempli (contexte récupéré + question), à envoyer au LLM de votre choix. Le prompt est identique à celui que `/query` envoie à Mistral.
+
+```bash
+curl -X POST http://127.0.0.1:8000/retrieve \
+  -H "Content-Type: application/json" \
+  -d '{"question": "Votre question", "top_k": 3}'
+```
+
+Mêmes paramètres que `/query`. Réponse :
+
+```json
+{
+  "prompt": "Tu es un assistant factuel.\n…\nQuestion : Votre question\nRéponse : ",
+  "sources": [{"file_name": "…", "score": 0.82, "text": "…"}]
+}
+```
+
+Codes d'erreur : `422` (requête invalide), `502` (erreur de Supabase).
+
 ## Tests
 
 ```bash
