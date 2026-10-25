@@ -5,8 +5,8 @@ API FastAPI exposant un pipeline RAG : récupération de chunks dans un index Su
 ## Prérequis
 
 - Python 3.12
-- Une clé API Mistral
 - Une base Supabase contenant l'index vectoriel
+- Une clé API Mistral (facultative, uniquement pour `/query`)
 
 ## Configuration
 
@@ -14,8 +14,8 @@ Copier `.env.example` vers `.env` et renseigner :
 
 | Variable | Description |
 |---|---|
-| `MISTRAL_API_KEY` | Clé API Mistral |
-| `SUPABASE_DB_URL` | URL de connexion Postgres de Supabase |
+| `SUPABASE_DB_URL` | URL de connexion Postgres de Supabase (obligatoire) |
+| `MISTRAL_API_KEY` | Clé API Mistral (facultative) : sans elle, `/query` répond `503` |
 
 ## Lancer en local
 
@@ -55,6 +55,8 @@ Réponse :
   "sources": [{"file_name": "…", "score": 0.82, "text": "…"}]
 }
 ```
+
+Codes d'erreur : `422` (requête invalide), `502` (erreur de Mistral), `503` (`MISTRAL_API_KEY` non configurée).
 
 ## Tests
 

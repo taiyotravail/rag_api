@@ -57,21 +57,31 @@ def fake_query_engine(source_nodes: list[NodeWithScore]) -> FakeQueryEngine:
 
 
 @pytest.fixture
-def environment(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Variables d'environnement minimales ; le `.env` local n'est jamais chargé pendant les tests."""
+def configured_mistral_keys(monkeypatch: pytest.MonkeyPatch, fake_query_engine: FakeQueryEngine) -> list[str | None]:
+    """Neutralise le `.env` local, HuggingFace, Supabase et Mistral ; enregistre les clés passées à `configure_models`."""
+    keys: list[str | None] = []
+    fake_index = object()
     monkeypatch.setattr(main, "load_dotenv", lambda: None)
-    monkeypatch.setenv("MISTRAL_API_KEY", "fake-key")
     monkeypatch.setenv("SUPABASE_DB_URL", "postgresql://fake")
+    monkeypatch.setattr(rag, "configure_models", keys.append)
+    monkeypatch.setattr(rag, "load_index", lambda url: fake_index)
+    monkeypatch.setattr(rag, "create_query_engine", lambda index, top_k: fake_query_engine)
+    return keys
 
 
 @pytest.fixture
-def client(
-    environment: None, monkeypatch: pytest.MonkeyPatch, fake_query_engine: FakeQueryEngine
+def client(configured_mistral_keys: list[str | None], monkeypatch: pytest.MonkeyPatch) -> Iterator[TestClient]:
+    """Client HTTP avec une clé Mistral configurée (génération activée)."""
+    monkeypatch.setenv("MISTRAL_API_KEY", "fake-key")
+    with TestClient(main.app) as test_client:
+        yield test_client
+
+
+@pytest.fixture
+def client_without_mistral_key(
+    configured_mistral_keys: list[str | None], monkeypatch: pytest.MonkeyPatch
 ) -> Iterator[TestClient]:
-    """Client HTTP dont le lifespan n'appelle ni HuggingFace, ni Supabase, ni Mistral."""
-    fake_index = object()
-    monkeypatch.setattr(rag, "configure_models", lambda key: None)
-    monkeypatch.setattr(rag, "load_index", lambda url: fake_index)
-    monkeypatch.setattr(rag, "create_query_engine", lambda index, top_k: fake_query_engine)
+    """Client HTTP sans clé Mistral (génération désactivée)."""
+    monkeypatch.delenv("MISTRAL_API_KEY", raising=False)
     with TestClient(main.app) as test_client:
         yield test_client

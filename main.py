@@ -35,7 +35,9 @@ class QueryResponse(BaseModel):
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Charge les modèles et connecte l'index Supabase une seule fois au démarrage."""
     load_dotenv()
-    rag.configure_models(rag.read_required_environment_variable("MISTRAL_API_KEY"))
+    mistral_api_key = rag.read_optional_environment_variable("MISTRAL_API_KEY")
+    rag.configure_models(mistral_api_key)
+    app.state.generation_enabled = mistral_api_key is not None
     app.state.index = rag.load_index(rag.read_required_environment_variable("SUPABASE_DB_URL"))
     yield
 
@@ -65,6 +67,8 @@ def health() -> dict[str, str]:
 @app.post("/query", response_model=QueryResponse)
 def query(payload: QueryRequest, request: Request) -> QueryResponse:
     """Interroge le RAG. Endpoint synchrone : FastAPI l'exécute dans un thread pool."""
+    if not request.app.state.generation_enabled:
+        raise HTTPException(status_code=503, detail="Génération désactivée : MISTRAL_API_KEY non configurée")
     query_engine = rag.create_query_engine(request.app.state.index, payload.top_k)
     try:
         llama_response = query_engine.query(payload.question)

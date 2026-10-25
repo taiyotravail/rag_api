@@ -43,3 +43,24 @@ def test_query_hides_generation_error_details(client: TestClient, fake_query_eng
 
     assert response.status_code == 502
     assert response.json() == {"detail": "Erreur du service de génération"}
+
+
+def test_startup_passes_mistral_key_to_models(client: TestClient, configured_mistral_keys: list[str | None]) -> None:
+    assert configured_mistral_keys == ["fake-key"]
+
+
+def test_startup_without_mistral_key_disables_llm(
+    client_without_mistral_key: TestClient, configured_mistral_keys: list[str | None]
+) -> None:
+    assert configured_mistral_keys == [None]
+    assert client_without_mistral_key.get("/health").status_code == 200
+
+
+def test_query_without_mistral_key_returns_503(
+    client_without_mistral_key: TestClient, fake_query_engine: FakeQueryEngine
+) -> None:
+    response = client_without_mistral_key.post("/query", json={"question": "Question"})
+
+    assert response.status_code == 503
+    assert "MISTRAL_API_KEY" in response.json()["detail"]
+    assert fake_query_engine.received_questions == []

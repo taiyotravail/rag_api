@@ -1,6 +1,6 @@
 """Pipeline RAG (LlamaIndex + Mistral + Supabase) isolé de la couche HTTP."""
 import os
-from typing import Any
+from typing import Any, Optional
 
 from llama_index.core import Settings, StorageContext, VectorStoreIndex
 from llama_index.core.prompts import PromptTemplate
@@ -25,9 +25,12 @@ QA_TEMPLATE_STR = (
 )
 
 
-def configure_models(mistral_api_key: str) -> None:
-    """Initialise le LLM Mistral et le modèle d'embedding dans les Settings globaux de LlamaIndex."""
-    Settings.llm = MistralAI(model=LLM_MODEL_NAME, api_key=mistral_api_key)
+def configure_models(mistral_api_key: Optional[str]) -> None:
+    """Initialise le LLM Mistral et le modèle d'embedding dans les Settings globaux de LlamaIndex.
+
+    Sans clé, le LLM est explicitement désactivé : LlamaIndex ne se rabat pas silencieusement sur OpenAI.
+    """
+    Settings.llm = MistralAI(model=LLM_MODEL_NAME, api_key=mistral_api_key) if mistral_api_key else None
     Settings.embed_model = HuggingFaceEmbedding(
         model_name=EMBEDDING_MODEL_NAME,
         text_instruction="passage: ",
@@ -60,3 +63,8 @@ def read_required_environment_variable(name: str) -> str:
     if not value:
         raise ValueError(f"Variable {name} introuvable dans l'environnement / .env")
     return value
+
+
+def read_optional_environment_variable(name: str) -> Optional[str]:
+    """Retourne la variable d'environnement `name`, ou None si elle est absente ou vide."""
+    return os.environ.get(name) or None
